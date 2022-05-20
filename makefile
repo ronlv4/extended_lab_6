@@ -6,7 +6,7 @@ LIST_DIR := list
 all: clean task0
 
 task0:
-	gcc -g -m32 -Wall -o $(BIN_DIR)/task0 $(SRC_DIR)/task0.c
+	gcc -g -m32 -Wall -o $(BIN_DIR)/task0 $(SRC_DIR)/mypipeline.c
 
 looper:
 	gcc -g -m32 -Wall -o $(BIN_DIR)/looper $(SRC_DIR)/looper.c
