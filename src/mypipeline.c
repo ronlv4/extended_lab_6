@@ -6,13 +6,16 @@
 #include "errno.h"
 
 int main(int argc, char **argv) {
-    int pipe_fd[2]; /* {read_end, write_end} */
-    pipe(pipe_fd);
     int err_fd = STDERR_FILENO;
+
+    int pipe_fd[2]; /* {read_end, write_end} */
     int wstatus1, wstatus2;
     pid_t ch1_pid;
     char *ls_args[] = { "ls", "-l", NULL };
     char *tail_args[] = { "tail", "-n", "2", NULL };
+
+    pipe(pipe_fd);
+
     dprintf(err_fd, "(parent_process>forking...)\n");
     ch1_pid = fork();
     if (ch1_pid == -1)
@@ -25,6 +28,11 @@ int main(int argc, char **argv) {
         dprintf(err_fd, "(parent_process>closing the write end of the pipe...)\n");
  	close(pipe_fd[1]);
         pid_t ch2_pid = fork();
+	if (ch2_pid == -1)
+    	{
+	    perror(NULL);
+	    _exit(errno);
+    	}
         if (ch2_pid){
             dprintf(err_fd, "(parent_process>closing the read end of the pipe...)\n");
             close(pipe_fd[0]);
