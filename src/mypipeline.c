@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     pid_t ch1_pid;
     char *ls_args[] = { "ls", "-l", NULL };
     char *tail_args[] = { "tail", "-n", "2", NULL };
-    dprintf(err_fd, "(parent_process>forking...)");
+    dprintf(err_fd, "(parent_process>forking...)\n");
     ch1_pid = fork();
     if (ch1_pid == -1)
     {
@@ -23,31 +23,31 @@ int main(int argc, char **argv) {
     }
     if (ch1_pid){
         dprintf(err_fd, "(parent_process>created process with id: %d)\n", ch1_pid);
-        dprintf(err_fd, "(parent_process>closing the write end of the pipe...)");
+        dprintf(err_fd, "(parent_process>closing the write end of the pipe...)\n");
         close(pipe_fd[1]);
         pid_t ch2_pid = fork();
         if (ch2_pid){
-            dprintf(err_fd, "(parent_process>closing the read end of the pipe...)");
+            dprintf(err_fd, "(parent_process>closing the read end of the pipe...)\n");
             close(pipe_fd[0]);
-            dprintf(err_fd, "(parent_process>waiting for the child processes to terminate...)");
+            dprintf(err_fd, "(parent_process>waiting for the child processes to terminate...)\n");
             waitpid(ch1_pid, &wstatus1, 0);
             waitpid(ch2_pid, &wstatus2, 0);
-            dprintf(err_fd, "(parent_process>exiting...)");
+            dprintf(err_fd, "(parent_process>exiting...)\n");
         } else{
-            dprintf(err_fd, "(child2>redirecting stdin to the read end of the pipe...)");
+            dprintf(err_fd, "(child2>redirecting stdin to the read end of the pipe...)\n");
             close(STDIN_FILENO);
             duplicated_read = dup(pipe_fd[0]);
             close(pipe_fd[0]);
-            dprintf(err_fd, "(child2>going to execute cmd: ...)");
+            dprintf(err_fd, "(child2>going to execute cmd: ...)\n");
             execvp("tail", tail_args);
         }
 
     } else{
-        dprintf(err_fd, "(child1>redirecting stdout to the write end of the pipe...)");
+        dprintf(err_fd, "(child1>redirecting stdout to the write end of the pipe...)\n");
         close(STDOUT_FILENO);
         duplicated_write = dup(pipe_fd[1]);
         close(pipe_fd[1]);
-        dprintf(err_fd, "(child1>going to execute cmd: ...)");
+        dprintf(err_fd, "(child1>going to execute cmd: ...)\n");
         execvp("ls", ls_args);
     }
 }
