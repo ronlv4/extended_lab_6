@@ -3,10 +3,10 @@ BIN_DIR := bin
 SRC_DIR := src
 LIST_DIR := list
 
-all: clean task0 looper task2
+all: clean task0
 
-task0: #  $(OBJ_DIR)/lineParser.o
-	gcc -g -m32 -Wall -o $(BIN_DIR)/myShell $(SRC_DIR)/myShell.c $(SRC_DIR)/lineParser.c
+task0:
+	gcc -g -m32 -Wall -o $(BIN_DIR)/task0 $(SRC_DIR)/task0.c
 
 looper:
 	gcc -g -m32 -Wall -o $(BIN_DIR)/looper $(SRC_DIR)/looper.c
