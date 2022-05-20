@@ -110,8 +110,8 @@ process* deleteProcess(process **process_list, process *to_delete){
     process* prev = NULL;
     if (temp != NULL && temp == to_delete)
     {
-        *process_list = temp->next; // Changed head
-        free(temp);            // free old head
+        *process_list = temp->next;
+        free(temp);
         return *process_list;
     }
  
@@ -136,21 +136,14 @@ void addProcess(process **process_list, cmdLine *cmd, pid_t pid) {
     ps->cmd = cmd;
     ps->pid = pid;
     ps->status = RUNNING;
-    ps->next = NULL;
-    printf("before assignment:\n\n");
-    printf("process list pointer is %p\n", process_list);
-    printf("process list value is %p\n", *process_list);
     if (!*process_list)
     {
-        /* process_list = malloc(sizeof(process*)); */
+        ps->next = NULL;
         *process_list = ps;
         return;
     }
     ps->next = *process_list;
     *process_list = ps;
-    printf("after assignment:\n\n");
-    printf("process list pointer is %p\n", process_list);
-    printf("process list value is %p\n", *process_list);
 }
 
 void printProcessList(process **process_list) {
