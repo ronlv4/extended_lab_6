@@ -98,7 +98,6 @@ void updateProcessStatus(process *process_list, int pid, int status)
             current_process = current_process->next;
             continue;
         }
-	printf("updating process %s to status %d\n", current_process->cmd->arguments[0], status);
         current_process->status = status;
         return;
     }
