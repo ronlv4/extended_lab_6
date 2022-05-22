@@ -11,6 +11,7 @@
 #include "limits.h"
 #include "string.h"
 #include "LineParser.h"
+#include "pipes.c"
 
 #define STDIN 0
 #define STDOUT 1
@@ -196,59 +197,69 @@ void simulate_chdir(char *cwd, char *path) {
         perror(NULL);
 }
 
+int execute_pipes(cmdLine *pCmdLine, process **process_list, int **pipes, int idx, int ch_pid, int nPipes){
+    int status;
+    if (idx == nPipes){
+	waitpid(ch_pid, &status, 0);
+	return execvp(pCmdLine->arguments[0], pCmdLine->arguments);
+    }
+    pid_t ch_pid;
+    int wstatus1;
+    ch_pid = fork();
+    if (ch_pid == -1){
+	perror(NULL);
+	_exit(errno);
+    }
+    if (ch_pid){
+        close(pipes[idx][1]);
+        if (ch2_pid){
+            close(pipes[idx][0]);
+        } else{
+            close(STDIN_FILENO);
+	    dup(pipes[idx][0]);
+            close(pipes[idx][0]);
+	    execute_pipes(pCmdLine->next, process_list, pipes, ch2_pid, idx + 1, nPipes);
+        }
 
-int execute(cmdLine *pCmdLine, process **process_list) {
-    int wstatus;
-    int pipe_fd[2];
-    int input_fd = STDIN_FILENO;
-    int output_fd = STDOUT_FILENO;
-    int is_input_redirect = pCmdLine->inputRedirect != NULL;
-    int is_output_redirect = pCmdLine->outputRedirect != NULL;
-    
-    if (is_input_redirect){
-	    input_fd = open(pCmdLine->inputRedirect, O_RDONLY);
-    }
-    if (is_output_redirect){
-	    output_fd = open(pCmdLine->outputRedirect, O_WRONLY);
-    }
-    pipe(pipe_fd);
-    pid_t ch_pid = fork();
-    if (ch_pid == -1) {
-        perror(NULL);
-        _exit(1);
-    }
-
-    if (ch_pid) {
-	if (is_input_redirect){
-	    close(input_fd);
-	}
-	if (is_output_redirect){
-	    close(output_fd);
-	}
-        addProcess(process_list,pCmdLine,ch_pid);
-        if (pCmdLine->blocking){
-            waitpid(ch_pid, &wstatus, 0);
-    	}
-    } else {
-	if (is_input_redirect){
-	    printf("child > closing STDIN");
-	    close(STDIN_FILENO);
-	    dup(input_fd);
-	    close(input_fd);
-	}
-	if (is_output_redirect){
-	    printf("child > closing STDOUT");
-	    close(STDOUT_FILENO);
-	    dup(output_fd);
-	    close(output_fd);
-	}
-        if (execvp(pCmdLine->arguments[0], pCmdLine->arguments) == -1)
-        {
-            perror(NULL);
-            _exit(errno);
-        }      
+    } else{
+        close(STDOUT_FILENO);
+        dup(pipes[idx][1]);
+        close(pipes[idx][1]);
+	execvp(pCmdLine->arguments[0], pCmdLine->arguments);
     }
     return 0;
+}
+
+
+int execute(cmdLine *pCmdLine, process **process_list) {
+    int nPipes = count_pipes(pCmdLine);
+    int **pipes = createPipes(nPipes);
+    int *left_pipe, right_pipe;
+
+    while (pCmdLine->next){
+	    left_pipe = leftPipe(pipes, pCmdLine);
+	    right_pipe = rightPipe(pipes, pCmdLine);
+	    ch_pid = fork();
+	    if (ch_pid){
+		    close(left_pipe[1]);
+		    close(left_pipe[0]);
+		    waitpid(ch_pid, wstatus, 0);
+	    }else{
+		    close(STDOUT_FILENO);
+		    dup(right_pipe[1]);
+		    close(right_pipe[0]);
+		    close(STDIN_FILENO);
+		    dup(left_pipe[1]);
+		    close(
+
+
+
+
+
+
+
+
+    return execute_pipes(pCmdLine, process_list, pipes, 0, 0, nPipes);
 }
 
 int main(int argc, char **argv) {
