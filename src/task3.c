@@ -197,7 +197,7 @@ void simulate_chdir(char *cwd, char *path) {
         perror(NULL);
 }
 
-int execute_pipes(cmdLine *pCmdLine, process **process_list, int **pipes, int idx, int ch_pid, int nPipes){
+/*int execute_pipes(cmdLine *pCmdLine, process **process_list, int **pipes, int idx, int ch_pid, int nPipes){
     int status;
     if (idx == nPipes){
 	waitpid(ch_pid, &status, 0);
@@ -228,38 +228,67 @@ int execute_pipes(cmdLine *pCmdLine, process **process_list, int **pipes, int id
 	execvp(pCmdLine->arguments[0], pCmdLine->arguments);
     }
     return 0;
-}
+}*/
+
 
 
 int execute(cmdLine *pCmdLine, process **process_list) {
     int nPipes = count_pipes(pCmdLine);
     int **pipes = createPipes(nPipes);
-    int *left_pipe, right_pipe;
+    int *left_pipe, *right_pipe;
+    cmdLine *cur = pCmdLine;
+    pid_t ch_pid;
+    int wstatus[nPipes+1];
+    int ch_pids[nPipes+1];
+    int input_fd, output_fd;
+    int is_input_redirect;
+    int is_output_redirect;
 
-    while (pCmdLine->next){
-	    left_pipe = leftPipe(pipes, pCmdLine);
-	    right_pipe = rightPipe(pipes, pCmdLine);
+    while (cur){
+            is_input_redirect = cur->inputRedirect != NULL;
+            is_output_redirect = cur->outputRedirect != NULL;
+	    left_pipe = leftPipe(pipes, cur);
+	    right_pipe = rightPipe(pipes, cur);
 	    ch_pid = fork();
+	    if (left_pipe){
+		    input_fd = left_pipe[0];
+	    }
+	    if (right_pipe){
+		    output_fd = right_pipe[1];
+	    }
 	    if (ch_pid){
-		    close(left_pipe[1]);
-		    close(left_pipe[0]);
-		    waitpid(ch_pid, wstatus, 0);
+		    if (left_pipe){
+			    close(left_pipe[0]);
+		    }
+		    if (right_pipe){
+			    close(right_pipe[1]);
+		    }
+		    ch_pids[cur->idx] = ch_pid;
 	    }else{
-		    close(STDOUT_FILENO);
-		    dup(right_pipe[1]);
-		    close(right_pipe[0]);
-		    close(STDIN_FILENO);
-		    dup(left_pipe[1]);
-		    close(
-
-
-
-
-
-
-
-
-    return execute_pipes(pCmdLine, process_list, pipes, 0, 0, nPipes);
+		    if (is_input_redirect){
+			    input_fd = open(cur->inputRedirect, O_RDONLY);
+		    }
+		    if (is_output_redirect){
+			    output_fd = open(cur->outputRedirect, O_WRONLY);
+		    }
+		    if (right_pipe){
+			    close(STDOUT_FILENO);
+			    dup(output_fd);
+			    close(output_fd);
+		    }
+		    if (left_pipe){
+			    close(STDIN_FILENO);
+			    dup(input_fd);
+			    close(input_fd);
+		    }
+		    execvp(cur->arguments[0], cur->arguments);
+	    }
+	    cur = cur->next;
+    }
+	    for (int i = 0; i < nPipes + 1; i++){
+		    waitpid(ch_pids[i], wstatus + i, 0);
+	    }
+    return 0;
 }
 
 int main(int argc, char **argv) {
