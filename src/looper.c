@@ -21,8 +21,6 @@ int main(int argc, char **argv){
 	signal(SIGTSTP, handler);
 	signal(SIGCONT, handler);
 
-	printf("Starting the program\n");
-
 	while(1) {
 		sleep(2);
 	}

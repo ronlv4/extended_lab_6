@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include "limits.h"
@@ -13,8 +11,6 @@
 #include "LineParser.h"
 #include "pipes.c"
 
-#define STDIN 0
-#define STDOUT 1
 #define MAX_PATH 4092
 #define MAX_LENGTH 2048
 
@@ -32,46 +28,73 @@ typedef struct process {
 } process;
 
 void updateProcessList();
-
 void nap();
-
 void stop();
-
 void updateProcessStatus();
-
 process *deleteProcess();
-
 void addProcess();
-
 void printProcessList();
-
 void freeProcessList();
-
 void simulate_chdir();
-
 int execute();
 
-void nap(cmdLine *pCmdLine) {
-    int status;
+void nap(process **process_list, cmdLine *pCmdLine) {
+    int status, ch_pid;
     int time = atoi(pCmdLine->arguments[1]);
     int ps_pid = atoi(pCmdLine->arguments[2]);
-    int pid = fork();
-    if (pid == -1) {
-        perror(NULL);
-        _exit(pid);
+    process *cur = *process_list;
+    while (cur) {
+        if (cur->pid != ps_pid){
+            cur = cur->next;
+            continue;
+        }
+        if (cur->status != RUNNING) {
+            printf("process %d is not RUNNING\n", ps_pid);
+            return;
+        }
+        ch_pid = fork();
+        if (ch_pid == -1) {
+            perror(NULL);
+            _exit(errno);
+        }
+        if (ch_pid) {
+            if (pCmdLine->blocking)
+                waitpid(ch_pid, &status, 0);
+        } else {
+            kill(ps_pid, SIGTSTP);
+            sleep(time);
+            kill(ps_pid, SIGCONT);
+        }
+        return;
     }
-    if (pid) {
-        if (pCmdLine->blocking)
-            waitpid(pid, &status, WNOHANG | WCONTINUED | WUNTRACED);
-    } else {
-        kill(ps_pid, SIGTSTP);
-        sleep(time);
-        kill(ps_pid, SIGCONT);
-    }
+    printf("process %d does not exist\n", ps_pid);
 }
 
-void stop(int pid) {
-    kill(pid, SIGINT);
+void stop(process **process_list, pid_t ps_pid) {
+    int status, ch_pid;
+    process *cur = *process_list;
+    while (cur) {
+        if (cur->pid != ps_pid){
+            cur = cur->next;
+            continue;
+        }
+        if (cur->status != RUNNING && cur->status != SUSPENDED) {
+            printf("process %d is not RUNNING or SUSPENDED\n", ps_pid);
+            return;
+        }
+        ch_pid = fork();
+        if (ch_pid == -1) {
+            perror(NULL);
+            _exit(errno);
+        }
+        if (ch_pid) {
+                waitpid(ch_pid, &status, 0);
+        } else {
+            kill(ps_pid, SIGINT);
+        }
+        return;
+    }
+    printf("process %d does not exist\n", ps_pid);
 }
 
 void updateProcessList(process **process_list) {
@@ -149,10 +172,11 @@ void printProcessList(process **process_list) {
         return;
     }
     updateProcessList(process_list);
+
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
-    int spaces_num = (w.ws_col - strlen("process_idcommandprocess_status")) / 2;
+    unsigned int spaces_num = (w.ws_col - strlen("process_idcommandprocess_status")) / 2;
     printf("%s %*s %*s\n", "process_id", spaces_num, "command", spaces_num, "process_status");
     process *current_process = *process_list;
 
@@ -191,41 +215,6 @@ void simulate_chdir(char *cwd, char *path) {
         perror(NULL);
 }
 
-/*int execute_pipes(cmdLine *pCmdLine, process **process_list, int **pipes, int idx, int ch_pid, int nPipes){
-    int status;
-    if (idx == nPipes){
-	waitpid(ch_pid, &status, 0);
-	return execvp(pCmdLine->arguments[0], pCmdLine->arguments);
-    }
-    pid_t ch_pid;
-    int wstatus1;
-    ch_pid = fork();
-    if (ch_pid == -1){
-	perror(NULL);
-	_exit(errno);
-    }
-    if (ch_pid){
-        close(pipes[idx][1]);
-        if (ch2_pid){
-            close(pipes[idx][0]);
-        } else{
-            close(STDIN_FILENO);
-	    dup(pipes[idx][0]);
-            close(pipes[idx][0]);
-	    execute_pipes(pCmdLine->next, process_list, pipes, ch2_pid, idx + 1, nPipes);
-        }
-
-    } else{
-        close(STDOUT_FILENO);
-        dup(pipes[idx][1]);
-        close(pipes[idx][1]);
-	execvp(pCmdLine->arguments[0], pCmdLine->arguments);
-    }
-    return 0;
-}*/
-
-
-
 int execute(cmdLine *pCmdLine, process **process_list) {
     int nPipes = count_pipes(pCmdLine);
     int **pipes = createPipes(nPipes);
@@ -254,6 +243,7 @@ int execute(cmdLine *pCmdLine, process **process_list) {
                 close(right_pipe[1]);
             }
             ch_pids[cur->idx] = ch_pid;
+            addProcess(process_list, cur, ch_pid);
         } else {
             if (is_input_redirect) {
                 input_fd = open(cur->inputRedirect, O_RDONLY);
@@ -281,8 +271,12 @@ int execute(cmdLine *pCmdLine, process **process_list) {
         }
         cur = cur->next;
     }
-    for (int i = 0; i < nPipes + 1; i++) {
-        waitpid(ch_pids[i], wstatus + i, 0);
+
+    cur = pCmdLine;
+    while (cur){
+        if (cur->blocking)
+            waitpid(ch_pids[cur->idx], wstatus + cur->idx, 0);
+        cur = cur->next;
     }
     return 0;
 }
@@ -294,12 +288,15 @@ int main(int argc, char **argv) {
     char user_input[MAX_LENGTH];
     while (1) {
         getcwd(cwd, MAX_PATH);
-        write(STDOUT, cwd, strlen(cwd));
-        write(STDOUT, "$ ", 2);
+        write(STDOUT_FILENO, cwd, strlen(cwd));
+        write(STDOUT_FILENO, "$ ", 2);
+        fflush(STDIN_FILENO);
         fgets(user_input, MAX_INPUT, stdin);
         user_input[strlen(user_input) - 1] = '\0';
-        if (strcmp(user_input, "quit") == 0)
+        if (strcmp(user_input, "quit") == 0) {
+            freeProcessList(process_list);
             _exit(0);
+        }
         if (strcmp(user_input, "") == 0)
             continue;
         current_cmd = parseCmdLines(user_input);
@@ -312,11 +309,11 @@ int main(int argc, char **argv) {
             continue;
         }
         if (strcmp(current_cmd->arguments[0], "nap") == 0) {
-            nap(current_cmd);
+            nap(&process_list, current_cmd);
             continue;
         }
         if (strcmp(current_cmd->arguments[0], "stop") == 0) {
-            stop(atoi(current_cmd->arguments[1]));
+            stop(&process_list, atoi(current_cmd->arguments[1]));
             continue;
         }
         execute(current_cmd, &process_list);
