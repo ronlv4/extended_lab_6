@@ -32,56 +32,57 @@ typedef struct process {
 } process;
 
 void updateProcessList();
+
 void nap();
+
 void stop();
+
 void updateProcessStatus();
-process* deleteProcess();
+
+process *deleteProcess();
+
 void addProcess();
+
 void printProcessList();
+
 void freeProcessList();
+
 void simulate_chdir();
+
 int execute();
 
-void nap(cmdLine *pCmdLine)
-{
+void nap(cmdLine *pCmdLine) {
     int status;
     int time = atoi(pCmdLine->arguments[1]);
     int ps_pid = atoi(pCmdLine->arguments[2]);
     int pid = fork();
-    if (pid == -1)
-    {
+    if (pid == -1) {
         perror(NULL);
         _exit(pid);
     }
-    if (pid)
-    {
+    if (pid) {
         if (pCmdLine->blocking)
             waitpid(pid, &status, WNOHANG | WCONTINUED | WUNTRACED);
-    }
-    else
-    {
+    } else {
         kill(ps_pid, SIGTSTP);
         sleep(time);
         kill(ps_pid, SIGCONT);
     }
 }
 
-void stop(int pid)
-{
+void stop(int pid) {
     kill(pid, SIGINT);
 }
 
-void updateProcessList(process **process_list)
-{
+void updateProcessList(process **process_list) {
     int status, ans;
     process *cur = *process_list;
-    while (cur)
-    {
+    while (cur) {
         pid_t ret = waitpid(cur->pid, &ans, WNOHANG | WCONTINUED | WUNTRACED);
-        if(ret != 0){
-            status = (WIFSIGNALED(ans)|| WIFEXITED(ans)) ? TERMINATED :
+        if (ret != 0) {
+            status = (WIFSIGNALED(ans) || WIFEXITED(ans)) ? TERMINATED :
                      WIFSTOPPED(ans) ? SUSPENDED :
-                     WIFCONTINUED(ans) ? RUNNING:
+                     WIFCONTINUED(ans) ? RUNNING :
                      2;
             if (status != 2)
                 updateProcessStatus(cur, cur->pid, status);
@@ -90,14 +91,11 @@ void updateProcessList(process **process_list)
     }
 }
 
-void updateProcessStatus(process *process_list, int pid, int status)
-{
+void updateProcessStatus(process *process_list, int pid, int status) {
     process *current_process = process_list;
-    
-    while (current_process)
-    {
-        if (current_process->pid != pid)
-        {
+
+    while (current_process) {
+        if (current_process->pid != pid) {
             current_process = current_process->next;
             continue;
         }
@@ -107,27 +105,25 @@ void updateProcessStatus(process *process_list, int pid, int status)
     printf("no such process - %d\n", pid);
 }
 
-process* deleteProcess(process **process_list, process *to_delete){
-    process* temp = *process_list;
-    process* prev = NULL;
-    if (temp != NULL && temp == to_delete)
-    {
+process *deleteProcess(process **process_list, process *to_delete) {
+    process *temp = *process_list;
+    process *prev = NULL;
+    if (temp != NULL && temp == to_delete) {
         *process_list = temp->next;
         free(temp);
         return *process_list;
     }
- 
-    while (temp != NULL && temp != to_delete)
-    {
+
+    while (temp != NULL && temp != to_delete) {
         prev = temp;
         temp = temp->next;
     }
- 
+
     if (temp == NULL)
         return NULL;
- 
+
     prev->next = temp->next;
- 
+
     free(temp);
 
     return prev->next;
@@ -138,8 +134,7 @@ void addProcess(process **process_list, cmdLine *cmd, pid_t pid) {
     ps->cmd = cmd;
     ps->pid = pid;
     ps->status = RUNNING;
-    if (!*process_list)
-    {
+    if (!*process_list) {
         ps->next = NULL;
         *process_list = ps;
         return;
@@ -161,16 +156,15 @@ void printProcessList(process **process_list) {
     printf("%s %*s %*s\n", "process_id", spaces_num, "command", spaces_num, "process_status");
     process *current_process = *process_list;
 
-    while (current_process)
-    {
-        char *string_status = current_process->status == -1 ? "TERMINATED":
-                                current_process->status == 1 ? "RUNNING" :
-                                "SUSPENDED";
-        printf("%d %*s %*s\n", current_process->pid,spaces_num, current_process->cmd->arguments[0], spaces_num, string_status);
-        if (current_process->status == TERMINATED)
-        {
-	    current_process = deleteProcess(process_list, current_process);
-	    continue;
+    while (current_process) {
+        char *string_status = current_process->status == -1 ? "TERMINATED" :
+                              current_process->status == 1 ? "RUNNING" :
+                              "SUSPENDED";
+        printf("%d %*s %*s\n", current_process->pid, spaces_num, current_process->cmd->arguments[0], spaces_num,
+               string_status);
+        if (current_process->status == TERMINATED) {
+            current_process = deleteProcess(process_list, current_process);
+            continue;
         }
         current_process = current_process->next;
     }
@@ -238,56 +232,58 @@ int execute(cmdLine *pCmdLine, process **process_list) {
     int *left_pipe, *right_pipe;
     cmdLine *cur = pCmdLine;
     pid_t ch_pid;
-    int wstatus[nPipes+1];
-    int ch_pids[nPipes+1];
+    int wstatus[nPipes + 1];
+    int ch_pids[nPipes + 1];
     int input_fd, output_fd;
     int is_input_redirect;
     int is_output_redirect;
 
-    while (cur){
-            is_input_redirect = cur->inputRedirect != NULL;
-            is_output_redirect = cur->outputRedirect != NULL;
-	    left_pipe = leftPipe(pipes, cur);
-	    right_pipe = rightPipe(pipes, cur);
-	    ch_pid = fork();
-	    if (left_pipe){
-		    input_fd = left_pipe[0];
-	    }
-	    if (right_pipe){
-		    output_fd = right_pipe[1];
-	    }
-	    if (ch_pid){
-		    if (left_pipe){
-			    close(left_pipe[0]);
-		    }
-		    if (right_pipe){
-			    close(right_pipe[1]);
-		    }
-		    ch_pids[cur->idx] = ch_pid;
-	    }else{
-		    if (is_input_redirect){
-			    input_fd = open(cur->inputRedirect, O_RDONLY);
-		    }
-		    if (is_output_redirect){
-			    output_fd = open(cur->outputRedirect, O_WRONLY);
-		    }
-		    if (right_pipe){
-			    close(STDOUT_FILENO);
-			    dup(output_fd);
-			    close(output_fd);
-		    }
-		    if (left_pipe){
-			    close(STDIN_FILENO);
-			    dup(input_fd);
-			    close(input_fd);
-		    }
-		    execvp(cur->arguments[0], cur->arguments);
-	    }
-	    cur = cur->next;
+    while (cur) {
+        input_fd = STDIN_FILENO;
+        output_fd = STDOUT_FILENO;
+        is_input_redirect = cur->inputRedirect != NULL;
+        is_output_redirect = cur->outputRedirect != NULL;
+        left_pipe = leftPipe(pipes, cur);
+        right_pipe = rightPipe(pipes, cur);
+        ch_pid = fork();
+        if (ch_pid) {
+            if (left_pipe) {
+                close(left_pipe[0]);
+            }
+            if (right_pipe) {
+                close(right_pipe[1]);
+            }
+            ch_pids[cur->idx] = ch_pid;
+        } else {
+            if (is_input_redirect) {
+                input_fd = open(cur->inputRedirect, O_RDONLY);
+            }
+            if (is_output_redirect) {
+                output_fd = open(cur->outputRedirect, O_WRONLY);
+            }
+            if (left_pipe) {
+                input_fd = left_pipe[0];
+            }
+            if (right_pipe) {
+                output_fd = right_pipe[1];
+            }
+            if (output_fd != STDOUT_FILENO) {
+                close(STDOUT_FILENO);
+                dup(output_fd);
+                close(output_fd);
+            }
+            if (input_fd != STDIN_FILENO) {
+                close(STDIN_FILENO);
+                dup(input_fd);
+                close(input_fd);
+            }
+            execvp(cur->arguments[0], cur->arguments);
+        }
+        cur = cur->next;
     }
-	    for (int i = 0; i < nPipes + 1; i++){
-		    waitpid(ch_pids[i], wstatus + i, 0);
-	    }
+    for (int i = 0; i < nPipes + 1; i++) {
+        waitpid(ch_pids[i], wstatus + i, 0);
+    }
     return 0;
 }
 
@@ -315,13 +311,11 @@ int main(int argc, char **argv) {
             printProcessList(&process_list);
             continue;
         }
-        if (strcmp(current_cmd->arguments[0], "nap") == 0)
-        {
+        if (strcmp(current_cmd->arguments[0], "nap") == 0) {
             nap(current_cmd);
             continue;
         }
-        if (strcmp(current_cmd->arguments[0], "stop") == 0)
-        {
+        if (strcmp(current_cmd->arguments[0], "stop") == 0) {
             stop(atoi(current_cmd->arguments[1]));
             continue;
         }

@@ -1,9 +1,0 @@
-""
-lo this is some sample text
-s.cs.bgu.ac.il floppy 4096 May 22 16:57 bin
--rw-r--r-- 1 ron7@wincs.cs.bgu.ac.il floppy  240 May 22 16:13 CMakeLists.txt
--rw-r--r-- 1 ron7@wincs.cs.bgu.ac.il floppy   31 May 22 16:49 in.txt
--rw-r--r-- 1 ron7@wincs.cs.bgu.ac.il floppy 1270 May 22 16:13 makefile
-drwxr-xr-x 2 ron7@wincs.cs.bgu.ac.il floppy 4096 May 22 16:13 obj
--rw-r--r-- 1 ron7@wincs.cs.bgu.ac.il floppy   31 May 22 16:57 out.txt
-drwxr-xr-x 2 ron7@wincs.cs.bgu.ac.il floppy 4096 May 22 16:57 src

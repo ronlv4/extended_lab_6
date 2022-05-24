@@ -1,4 +1,7 @@
 int ** createPipes(int nPipes){
+    if (!nPipes){
+        return NULL;
+    }
     int** pipes;
     pipes=(int**) calloc(nPipes, sizeof(int));
 
