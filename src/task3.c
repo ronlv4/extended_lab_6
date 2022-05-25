@@ -249,7 +249,7 @@ int execute(cmdLine *pCmdLine, process **process_list) {
                 input_fd = open(cur->inputRedirect, O_RDONLY);
             }
             if (is_output_redirect) {
-                output_fd = open(cur->outputRedirect, O_WRONLY);
+                output_fd = open(cur->outputRedirect, O_WRONLY | O_CREAT, 0644);
             }
             if (left_pipe) {
                 input_fd = left_pipe[0];
